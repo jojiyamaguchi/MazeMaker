@@ -39,6 +39,8 @@
         const maxYellowCells = 10;
         let highlightMap = {};
         let cheeseCount = 0;
+        let tailShakeAngle = 0;
+        let mouseDrawn = false;
 
         function updateCheeseCountDisplay() {
             document.getElementById('cheeseCountDisplay').innerText = `チーズ使用回数: ${cheeseCount}`;
@@ -78,7 +80,10 @@
                     drawCheese(cheese.x, cheese.y);
                 }
                 drawStartAndGoal();
-                drawMouse(mouseX, mouseY, mouseDirection);
+                if (!mouseDrawn) {
+                    drawMouse(mouseX, mouseY, mouseDirection, tailShakeAngle);
+                    mouseDrawn = true;
+                }
             }
 
             function Cell(x, y) {
@@ -175,7 +180,7 @@
                 ctx.fillRect((cols - 1) * cellSize, (rows - 1) * cellSize, cellSize, cellSize);
             }
 
-            function drawMouse(x, y, direction) {
+            function drawMouse(x, y, direction, tailAngle = 0) {
                 const mouseSize = cellSize * 0.6;
                 const offsetX = (cellSize - mouseSize) / 2;
                 const offsetY = (cellSize - mouseSize) / 2;
@@ -200,10 +205,14 @@
                 // Draw mouse tail
                 ctx.strokeStyle = 'gray';
                 ctx.lineWidth = 2;
+                ctx.save();
+                ctx.translate(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+                ctx.rotate(tailAngle);
                 ctx.beginPath();
-                ctx.moveTo(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
-                ctx.lineTo(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2 + mouseSize);
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, mouseSize);
                 ctx.stroke();
+                ctx.restore();
 
                 ctx.restore();
             }
@@ -293,6 +302,7 @@
                                 mouseDirection = nextMove.direction;
                                 draw();
                             } else {
+                                animateMouseMove(mouseX, mouseY, nextMove.x, nextMove.y, nextMove.direction);
                                 mouseX = nextMove.x;
                                 mouseY = nextMove.y;
                                 visitedCells.add(`${mouseX},${mouseY}`);
@@ -317,6 +327,7 @@
                                     mouseDirection = (currentDirection + i) % directions.length;
                                     draw();
                                 } else {
+                                    animateMouseMove(mouseX, mouseY, newX, newY, (currentDirection + i) % directions.length);
                                     mouseX = newX;
                                     mouseY = newY;
                                     visitedCells.add(`${newX},${newY}`);
@@ -339,8 +350,6 @@
                         }
                     }
 
-                    draw();
-
                     if (mouseX === cols - 1 && mouseY === rows - 1) {
                         clearInterval(mouseInterval);
                         ctx.fillStyle = 'black';
@@ -349,6 +358,37 @@
                         ctx.fillText(`チーズ使用回数: ${cheeseCount}`, canvas.width / 2 - 150, canvas.height / 2 + 60);
                     }
                 }, 500);
+            }
+
+            function animateMouseMove(startX, startY, endX, endY, direction) {
+                const startTime = Date.now();
+                const duration = 500;
+                const tailShakeFrequency = 20; // Tail shake frequency in milliseconds
+                const tailShakeAmplitude = Math.PI / 8; // Tail shake amplitude in radians (±25°)
+
+                function animate() {
+                    const currentTime = Date.now();
+                    const elapsedTime = currentTime - startTime;
+                    const progress = Math.min(elapsedTime / duration, 1);
+
+                    const currentX = startX + (endX - startX) * progress;
+                    const currentY = startY + (endY - startY) * progress;
+
+                    const tailAngle = tailShakeAmplitude * Math.sin((elapsedTime / tailShakeFrequency) * Math.PI * 2);
+
+                    draw();
+                    drawMouse(currentX, currentY, direction, tailAngle);
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Ensure only one mouse is drawn
+                        draw();
+                        drawMouse(endX, endY, direction);
+                    }
+                }
+
+                requestAnimationFrame(animate);
             }
 
             const interval = setInterval(step, 50);
@@ -362,6 +402,7 @@
             cheeseCount++;
             updateCheeseCountDisplay();
             visitedCells.clear();
+            mouseDrawn = false;
             moveMouse();
             draw();
         });
@@ -370,8 +411,27 @@
             clearInterval(mouseInterval);
             mouseX = 0;
             mouseY = 0;
+            mouseDrawn = false;
             generateMaze();
         });
+
+        function animateTail() {
+            const tailShakeFrequency = 20; // Tail shake frequency in milliseconds
+            const tailShakeAmplitude = Math.PI / 8; // Tail shake amplitude in radians (±25°)
+            const startTime = Date.now();
+
+            function animate() {
+                const currentTime = Date.now();
+                const elapsedTime = currentTime - startTime;
+                tailShakeAngle = tailShakeAmplitude * Math.sin((elapsedTime / tailShakeFrequency) * Math.PI * 2);
+                draw();
+                requestAnimationFrame(animate);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animateTail();
     </script>
 </body>
 </html>
