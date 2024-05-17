@@ -20,9 +20,20 @@
         const cellSize = 20;
         const cols = canvas.width / cellSize;
         const rows = canvas.height / cellSize;
+        let arrowX = 0;
+        let arrowY = 0;
+        let arrowInterval;
+        let grid = [];
+        let visitedCells = new Set();
+        let cheese = null;
+        const maxYellowCells = 10;
+        let highlightMap = {};
 
         function generateMaze() {
-            const grid = [];
+            grid = [];
+            visitedCells = new Set();
+            cheese = null;
+            highlightMap = {};
             const stack = [];
             let current;
 
@@ -40,7 +51,12 @@
                 for (let i = 0; i < grid.length; i++) {
                     grid[i].show();
                 }
+                if (cheese) {
+                    highlightCells(cheese.x, cheese.y);
+                    drawCheese(cheese.x, cheese.y);
+                }
                 drawStartAndGoal();
+                drawArrow(arrowX, arrowY);
             }
 
             function Cell(x, y) {
@@ -82,7 +98,7 @@
                         const r = Math.floor(Math.random() * neighbors.length);
                         return neighbors[r];
                     } else {
-                        return undefined;
+                        return null;
                     }
                 };
             }
@@ -125,6 +141,7 @@
                     current = stack.pop();
                 } else {
                     clearInterval(interval);
+                    moveArrow();
                 }
             }
 
@@ -138,8 +155,155 @@
                 ctx.fillRect((cols - 1) * cellSize, (rows - 1) * cellSize, cellSize, cellSize);
             }
 
+            function drawArrow(x, y) {
+                const arrowSize = cellSize * 0.6;
+                const offsetX = (cellSize - arrowSize) / 2;
+                const offsetY = (cellSize - arrowSize) / 2;
+                ctx.fillStyle = 'blue';
+                ctx.beginPath();
+                ctx.moveTo(x * cellSize + offsetX, y * cellSize + offsetY + arrowSize / 2);
+                ctx.lineTo(x * cellSize + offsetX + arrowSize, y * cellSize + offsetY + arrowSize / 2);
+                ctx.lineTo(x * cellSize + offsetX + arrowSize / 2, y * cellSize + offsetY);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function drawCheese(x, y) {
+                const cheeseSize = cellSize * 0.6;
+                const offsetX = (cellSize - cheeseSize) / 2;
+                const offsetY = (cellSize - cheeseSize) / 2;
+                ctx.fillStyle = 'rgba(255, 128, 0)';
+                ctx.beginPath();
+                ctx.moveTo(x * cellSize + offsetX, y * cellSize + offsetY + cheeseSize);
+                ctx.lineTo(x * cellSize + offsetX + cheeseSize, y * cellSize + offsetY + cheeseSize);
+                ctx.lineTo(x * cellSize + offsetX + cheeseSize / 2, y * cellSize + offsetY);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function highlightCells(cx, cy) {
+                const queue = [{ x: cx, y: cy, distance: 0 }];
+                const visited = new Set();
+                visited.add(`${cx},${cy}`);
+                highlightMap = {};
+
+                while (queue.length > 0) {
+                    const { x, y, distance } = queue.shift();
+                    if (distance > maxYellowCells) break;
+
+                    const intensity = (1 - distance / maxYellowCells) * 0.8;
+                    ctx.fillStyle = `rgba(255, 255, 0, ${intensity})`;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    highlightMap[`${x},${y}`] = intensity;
+
+                    const directions = [
+                        { dx: 1, dy: 0, wall: 1, oppositeWall: 3 }, // right
+                        { dx: 0, dy: 1, wall: 2, oppositeWall: 0 }, // down
+                        { dx: -1, dy: 0, wall: 3, oppositeWall: 1 }, // left
+                        { dx: 0, dy: -1, wall: 0, oppositeWall: 2 }  // up
+                    ];
+
+                    for (const dir of directions) {
+                        const newX = x + dir.dx;
+                        const newY = y + dir.dy;
+                        const currentCell = grid[index(x, y)];
+                        const nextCell = grid[index(newX, newY)];
+
+                        if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !nextCell.walls[dir.oppositeWall] && !visited.has(`${newX},${newY}`)) {
+                            queue.push({ x: newX, y: newY, distance: distance + 1 });
+                            visited.add(`${newX},${newY}`);
+                        }
+                    }
+                }
+            }
+
+            function moveArrow() {
+                const directions = [
+                    { dx: 1, dy: 0, wall: 1 }, // right
+                    { dx: 0, dy: 1, wall: 2 }, // down
+                    { dx: -1, dy: 0, wall: 3 }, // left
+                    { dx: 0, dy: -1, wall: 0 }  // up
+                ];
+                let currentDirection = 0;
+
+                arrowInterval = setInterval(() => {
+                    let moved = false;
+
+                    if (cheese && highlightMap[`${arrowX},${arrowY}`]) {
+                        let maxIntensity = -1;
+                        let nextMove = null;
+
+                        for (const dir of directions) {
+                            const newX = arrowX + dir.dx;
+                            const newY = arrowY + dir.dy;
+                            const currentCell = grid[index(arrowX, arrowY)];
+                            const nextCell = grid[index(newX, newY)];
+
+                            if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !nextCell.walls[dir.oppositeWall]) {
+                                const intensity = highlightMap[`${newX},${newY}`];
+                                if (intensity > maxIntensity) {
+                                    maxIntensity = intensity;
+                                    nextMove = { x: newX, y: newY };
+                                }
+                            }
+                        }
+
+                        if (nextMove) {
+                            arrowX = nextMove.x;
+                            arrowY = nextMove.y;
+                            moved = true;
+                        }
+
+                        if (arrowX === cheese.x && arrowY === cheese.y) {
+                            cheese = null;
+                            highlightMap = {};
+                        }
+                    } else {
+                        for (let i = 0; i < directions.length; i++) {
+                            const dir = directions[(currentDirection + i) % directions.length];
+                            const newX = arrowX + dir.dx;
+                            const newY = arrowY + dir.dy;
+                            const currentCell = grid[index(arrowX, arrowY)];
+                            const nextCell = grid[index(newX, newY)];
+
+                            if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !visitedCells.has(`${newX},${newY}`)) {
+                                arrowX = newX;
+                                arrowY = newY;
+                                visitedCells.add(`${newX},${newY}`);
+                                currentDirection = (currentDirection + i) % directions.length;
+                                moved = true;
+                                break;
+                            }
+                        }
+
+                        if (!moved) {
+                            setTimeout(() => {
+                                const next = grid[index(arrowX, arrowY)].checkNeighbors();
+                                if (next) {
+                                    arrowX = next.x;
+                                    arrowY = next.y;
+                                    visitedCells.add(`${arrowX},${arrowY}`);
+                                }
+                            }, 500);
+                        }
+                    }
+
+                    draw();
+                }, 500);
+            }
+
             const interval = setInterval(step, 50);
         }
+
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / cellSize);
+            const y = Math.floor((event.clientY - rect.top) / cellSize);
+            cheese = { x, y };
+            visitedCells.clear();
+            moveArrow();
+            draw();
+        });
 
         document.getElementById('generateMaze').addEventListener('click', generateMaze);
     </script>
