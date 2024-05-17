@@ -173,7 +173,9 @@
             }
 
             function drawStartAndGoal() {
-                // startはDrawしない
+                // Draw start
+                ctx.fillStyle = 'rgba(200,200,200, 0.5)';
+                ctx.fillRect(0, 0, cellSize, cellSize);
 
                 // Draw goal
                 ctx.fillStyle = 'red';
@@ -348,14 +350,6 @@
                                 }
                             }, 500);
                         }
-                    }
-
-                    if (mouseX === cols - 1 && mouseY === rows - 1) {
-                        clearInterval(mouseInterval);
-                        ctx.fillStyle = 'black';
-                        ctx.font = '48px serif';
-                        ctx.fillText('ゲームクリア', canvas.width / 2 - 100, canvas.height / 2);
-                        ctx.fillText(`チーズ使用回数: ${cheeseCount}`, canvas.width / 2 - 150, canvas.height / 2 + 60);
                     }
                 }, 500);
             }
