@@ -21,6 +21,7 @@
     </select>
     <button id="generateMaze">新しい迷路を作る</button>
     <canvas id="mazeCanvas" width="500" height="500"></canvas>
+    <div id="cheeseCountDisplay">チーズ使用回数: 0</div>
 
     <script>
         const canvas = document.getElementById('mazeCanvas');
@@ -28,15 +29,20 @@
         let cellSize;
         let cols;
         let rows;
-        let arrowX = 0;
-        let arrowY = 0;
-        let arrowInterval;
+        let mouseX = 0;
+        let mouseY = 0;
+        let mouseDirection = 0;
+        let mouseInterval;
         let grid = [];
         let visitedCells = new Set();
         let cheese = null;
         const maxYellowCells = 10;
         let highlightMap = {};
         let cheeseCount = 0;
+
+        function updateCheeseCountDisplay() {
+            document.getElementById('cheeseCountDisplay').innerText = `チーズ使用回数: ${cheeseCount}`;
+        }
 
         function generateMaze() {
             const level = parseInt(document.getElementById('level').value);
@@ -49,6 +55,7 @@
             cheese = null;
             highlightMap = {};
             cheeseCount = 0;
+            updateCheeseCountDisplay();
             const stack = [];
             let current;
 
@@ -71,7 +78,7 @@
                     drawCheese(cheese.x, cheese.y);
                 }
                 drawStartAndGoal();
-                drawArrow(arrowX, arrowY);
+                drawMouse(mouseX, mouseY, mouseDirection);
             }
 
             function Cell(x, y) {
@@ -156,7 +163,7 @@
                     current = stack.pop();
                 } else {
                     clearInterval(interval);
-                    moveArrow();
+                    moveMouse();
                 }
             }
 
@@ -168,17 +175,37 @@
                 ctx.fillRect((cols - 1) * cellSize, (rows - 1) * cellSize, cellSize, cellSize);
             }
 
-            function drawArrow(x, y) {
-                const arrowSize = cellSize * 0.6;
-                const offsetX = (cellSize - arrowSize) / 2;
-                const offsetY = (cellSize - arrowSize) / 2;
-                ctx.fillStyle = 'blue';
+            function drawMouse(x, y, direction) {
+                const mouseSize = cellSize * 0.6;
+                const offsetX = (cellSize - mouseSize) / 2;
+                const offsetY = (cellSize - mouseSize) / 2;
+
+                ctx.save();
+                ctx.translate(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+                ctx.rotate((Math.PI / 2) * (direction + 1)); // Rotate 90 degrees more
+                ctx.translate(-x * cellSize - cellSize / 2, -y * cellSize - cellSize / 2);
+
+                // Draw mouse body
+                ctx.fillStyle = 'gray';
                 ctx.beginPath();
-                ctx.moveTo(x * cellSize + offsetX, y * cellSize + offsetY + arrowSize / 2);
-                ctx.lineTo(x * cellSize + offsetX + arrowSize, y * cellSize + offsetY + arrowSize / 2);
-                ctx.lineTo(x * cellSize + offsetX + arrowSize / 2, y * cellSize + offsetY);
-                ctx.closePath();
+                ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, mouseSize / 2, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Draw mouse ears
+                ctx.beginPath();
+                ctx.arc(x * cellSize + cellSize / 2 - mouseSize / 3, y * cellSize + cellSize / 2 - mouseSize / 3, mouseSize / 4, 0, Math.PI * 2);
+                ctx.arc(x * cellSize + cellSize / 2 + mouseSize / 3, y * cellSize + cellSize / 2 - mouseSize / 3, mouseSize / 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw mouse tail
+                ctx.strokeStyle = 'gray';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+                ctx.lineTo(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2 + mouseSize);
+                ctx.stroke();
+
+                ctx.restore();
             }
 
             function drawCheese(x, y) {
@@ -230,7 +257,7 @@
                 }
             }
 
-            function moveArrow() {
+            function moveMouse() {
                 const directions = [
                     { dx: 1, dy: 0, wall: 1 }, // right
                     { dx: 0, dy: 1, wall: 2 }, // down
@@ -239,64 +266,74 @@
                 ];
                 let currentDirection = 0;
 
-                arrowInterval = setInterval(() => {
+                mouseInterval = setInterval(() => {
                     let moved = false;
 
-                    if (cheese && highlightMap[`${arrowX},${arrowY}`]) {
+                    if (cheese && highlightMap[`${mouseX},${mouseY}`]) {
                         let maxIntensity = -1;
                         let nextMove = null;
 
                         for (const dir of directions) {
-                            const newX = arrowX + dir.dx;
-                            const newY = arrowY + dir.dy;
-                            const currentCell = grid[index(arrowX, arrowY)];
+                            const newX = mouseX + dir.dx;
+                            const newY = mouseY + dir.dy;
+                            const currentCell = grid[index(mouseX, mouseY)];
                             const nextCell = grid[index(newX, newY)];
 
                             if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !nextCell.walls[dir.oppositeWall]) {
                                 const intensity = highlightMap[`${newX},${newY}`];
                                 if (intensity > maxIntensity) {
                                     maxIntensity = intensity;
-                                    nextMove = { x: newX, y: newY };
+                                    nextMove = { x: newX, y: newY, direction: directions.indexOf(dir) };
                                 }
                             }
                         }
 
                         if (nextMove) {
-                            arrowX = nextMove.x;
-                            arrowY = nextMove.y;
-                            visitedCells.add(`${arrowX},${arrowY}`);
-                            moved = true;
+                            if (mouseDirection !== nextMove.direction) {
+                                mouseDirection = nextMove.direction;
+                                draw();
+                            } else {
+                                mouseX = nextMove.x;
+                                mouseY = nextMove.y;
+                                visitedCells.add(`${mouseX},${mouseY}`);
+                                moved = true;
+                            }
                         }
 
-                        if (arrowX === cheese.x && arrowY === cheese.y) {
+                        if (mouseX === cheese.x && mouseY === cheese.y) {
                             cheese = null;
                             highlightMap = {};
                         }
                     } else {
                         for (let i = 0; i < directions.length; i++) {
                             const dir = directions[(currentDirection + i) % directions.length];
-                            const newX = arrowX + dir.dx;
-                            const newY = arrowY + dir.dy;
-                            const currentCell = grid[index(arrowX, arrowY)];
+                            const newX = mouseX + dir.dx;
+                            const newY = mouseY + dir.dy;
+                            const currentCell = grid[index(mouseX, mouseY)];
                             const nextCell = grid[index(newX, newY)];
 
                             if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !visitedCells.has(`${newX},${newY}`)) {
-                                arrowX = newX;
-                                arrowY = newY;
-                                visitedCells.add(`${newX},${newY}`);
-                                currentDirection = (currentDirection + i) % directions.length;
-                                moved = true;
+                                if (mouseDirection !== (currentDirection + i) % directions.length) {
+                                    mouseDirection = (currentDirection + i) % directions.length;
+                                    draw();
+                                } else {
+                                    mouseX = newX;
+                                    mouseY = newY;
+                                    visitedCells.add(`${newX},${newY}`);
+                                    currentDirection = (currentDirection + i) % directions.length;
+                                    moved = true;
+                                }
                                 break;
                             }
                         }
 
                         if (!moved) {
                             setTimeout(() => {
-                                const next = grid[index(arrowX, arrowY)].checkNeighbors();
+                                const next = grid[index(mouseX, mouseY)].checkNeighbors();
                                 if (next) {
-                                    arrowX = next.x;
-                                    arrowY = next.y;
-                                    visitedCells.add(`${arrowX},${arrowY}`);
+                                    mouseX = next.x;
+                                    mouseY = next.y;
+                                    visitedCells.add(`${mouseX},${mouseY}`);
                                 }
                             }, 500);
                         }
@@ -304,8 +341,8 @@
 
                     draw();
 
-                    if (arrowX === cols - 1 && arrowY === rows - 1) {
-                        clearInterval(arrowInterval);
+                    if (mouseX === cols - 1 && mouseY === rows - 1) {
+                        clearInterval(mouseInterval);
                         ctx.fillStyle = 'black';
                         ctx.font = '48px serif';
                         ctx.fillText('ゲームクリア', canvas.width / 2 - 100, canvas.height / 2);
@@ -323,15 +360,16 @@
             const y = Math.floor((event.clientY - rect.top) / cellSize);
             cheese = { x, y };
             cheeseCount++;
+            updateCheeseCountDisplay();
             visitedCells.clear();
-            moveArrow();
+            moveMouse();
             draw();
         });
 
         document.getElementById('generateMaze').addEventListener('click', () => {
-            clearInterval(arrowInterval);
-            arrowX = 0;
-            arrowY = 0;
+            clearInterval(mouseInterval);
+            mouseX = 0;
+            mouseY = 0;
             generateMaze();
         });
     </script>
