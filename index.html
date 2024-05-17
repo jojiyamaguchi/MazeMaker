@@ -11,15 +11,23 @@
     </style>
 </head>
 <body>
+    <label for="level">レベルを選択:</label>
+    <select id="level">
+        <option value="1">レベル 1</option>
+        <option value="2">レベル 2</option>
+        <option value="3">レベル 3</option>
+        <option value="4">レベル 4</option>
+        <option value="5">レベル 5</option>
+    </select>
     <button id="generateMaze">新しい迷路を作る</button>
     <canvas id="mazeCanvas" width="500" height="500"></canvas>
 
     <script>
         const canvas = document.getElementById('mazeCanvas');
         const ctx = canvas.getContext('2d');
-        const cellSize = 20;
-        const cols = canvas.width / cellSize;
-        const rows = canvas.height / cellSize;
+        let cellSize;
+        let cols;
+        let rows;
         let arrowX = 0;
         let arrowY = 0;
         let arrowInterval;
@@ -28,12 +36,19 @@
         let cheese = null;
         const maxYellowCells = 10;
         let highlightMap = {};
+        let cheeseCount = 0;
 
         function generateMaze() {
+            const level = parseInt(document.getElementById('level').value);
+            cellSize = 100 / level;
+            cols = Math.floor(canvas.width / cellSize);
+            rows = Math.floor(canvas.height / cellSize);
+
             grid = [];
             visitedCells = new Set();
             cheese = null;
             highlightMap = {};
+            cheeseCount = 0;
             const stack = [];
             let current;
 
@@ -146,9 +161,7 @@
             }
 
             function drawStartAndGoal() {
-                // Draw start
-                ctx.fillStyle = 'green';
-                ctx.fillRect(0, 0, cellSize, cellSize);
+                // startはDrawしない
 
                 // Draw goal
                 ctx.fillStyle = 'red';
@@ -251,6 +264,7 @@
                         if (nextMove) {
                             arrowX = nextMove.x;
                             arrowY = nextMove.y;
+                            visitedCells.add(`${arrowX},${arrowY}`);
                             moved = true;
                         }
 
@@ -289,6 +303,14 @@
                     }
 
                     draw();
+
+                    if (arrowX === cols - 1 && arrowY === rows - 1) {
+                        clearInterval(arrowInterval);
+                        ctx.fillStyle = 'black';
+                        ctx.font = '48px serif';
+                        ctx.fillText('ゲームクリア', canvas.width / 2 - 100, canvas.height / 2);
+                        ctx.fillText(`チーズ使用回数: ${cheeseCount}`, canvas.width / 2 - 150, canvas.height / 2 + 60);
+                    }
                 }, 500);
             }
 
@@ -300,12 +322,18 @@
             const x = Math.floor((event.clientX - rect.left) / cellSize);
             const y = Math.floor((event.clientY - rect.top) / cellSize);
             cheese = { x, y };
+            cheeseCount++;
             visitedCells.clear();
             moveArrow();
             draw();
         });
 
-        document.getElementById('generateMaze').addEventListener('click', generateMaze);
+        document.getElementById('generateMaze').addEventListener('click', () => {
+            clearInterval(arrowInterval);
+            arrowX = 0;
+            arrowY = 0;
+            generateMaze();
+        });
     </script>
 </body>
 </html>
