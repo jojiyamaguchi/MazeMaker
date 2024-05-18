@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -21,9 +20,10 @@
         <option value="5">レベル 5</option>
     </select>
     <button id="generateMaze">新しい迷路を作る</button>
+    <button id="restartGame">リスタート</button>
     <canvas id="mazeCanvas"></canvas>
     <div id="cheeseCountDisplay">チーズ使用回数: 0</div>
-    <div id="gameMessage"　style="font-size:40pt"></div>
+    <div id="gameMessage" style="font-size:40pt"></div>
 
     <script>
         const canvas = document.getElementById('mazeCanvas');
@@ -36,7 +36,7 @@
         let mouseDirection = 0;
         let mouseInterval;
         let grid = [];
-        let visitedCells = new Set();
+        let visitedCells = [{x:0,y:0}];
         let cheese = null;
         const maxYellowCells = 10;
         let highlightMap = {};
@@ -56,15 +56,15 @@
         }
 
         function generateMaze() {
+            const interval = setInterval(step, 50); 
             setCanvasSize();
             const level = parseInt(document.getElementById('level').value);
-            cellSize = 100 / level;
-            cols = Math.ceil(canvas.width / cellSize);
+            cellSize = Math.floor(canvas.width / (level * 10));
+            cols = Math.floor(canvas.width / cellSize);
             rows = cols;
-            //rows = Math.floor(canvas.height / cellSize);
 
             grid = [];
-            visitedCells = new Set();
+            visitedCells = [{x:0,y:0}];
             cheese = null;
             highlightMap = {};
             cheeseCount = 0;
@@ -85,6 +85,10 @@
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 for (let i = 0; i < grid.length; i++) {
                     grid[i].show();
+                }
+                for(let i = 0; i < visitedCells.length; i++) {
+                    ctx.fillStyle = `rgba(0, 0, 255, 0.05)`;
+                    ctx.fillRect(visitedCells[i].x * cellSize, visitedCells[i].y * cellSize, cellSize, cellSize);
                 }
                 if (cheese) {
                     highlightCells(cheese.x, cheese.y);
@@ -107,7 +111,7 @@
                     const x = this.x * cellSize;
                     const y = this.y * cellSize;
                     ctx.strokeStyle = 'black';
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 4;
 
                     if (this.walls[0]) ctx.strokeRect(x, y, cellSize, 0); // top
                     if (this.walls[1]) ctx.strokeRect(x + cellSize, y, 0, cellSize); // right
@@ -180,13 +184,14 @@
                 } else {
                     clearInterval(interval);
                     moveMouse();
+                    return;
                 }
             }
 
             function drawStartAndGoal() {
                 // Draw start
-                ctx.fillStyle = 'rgba(200,200,200, 0.5)';
-                ctx.fillRect(0, 0, cellSize, cellSize);
+                //ctx.fillStyle = 'rgba(200,200,200, 0.5)';
+                //ctx.fillRect(0, 0, cellSize, cellSize);
 
                 // Draw goal
                 ctx.fillStyle = 'red';
@@ -283,93 +288,75 @@
             }
 
             function moveMouse() {
+                let possibleMoves = [];
+                let maxIntensity = -1;
+                let moved = false;
                 const directions = [
                     { dx: 1, dy: 0, wall: 1 }, // right
                     { dx: 0, dy: 1, wall: 2 }, // down
                     { dx: -1, dy: 0, wall: 3 }, // left
                     { dx: 0, dy: -1, wall: 0 }  // up
                 ];
-                let currentDirection = 0;
 
                 mouseInterval = setInterval(() => {
-                    let moved = false;
+                    possibleMoves = [];
+                    maxIntensity = -1;
+                    moved = false;
 
-                    if (cheese && highlightMap[`${mouseX},${mouseY}`]) {
-                        let maxIntensity = -1;
-                        let nextMove = null;
+                    for (const dir of directions) {
+                        const newX = mouseX + dir.dx;
+                        const newY = mouseY + dir.dy;
+                        const currentCell = grid[index(mouseX, mouseY)];
+                        const nextCell = grid[index(newX, newY)];
 
-                        for (const dir of directions) {
-                            const newX = mouseX + dir.dx;
-                            const newY = mouseY + dir.dy;
-                            const currentCell = grid[index(mouseX, mouseY)];
-                            const nextCell = grid[index(newX, newY)];
-
-                            if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !nextCell.walls[dir.oppositeWall]) {
-                                const intensity = highlightMap[`${newX},${newY}`];
-                                if (intensity > maxIntensity) {
-                                    maxIntensity = intensity;
-                                    nextMove = { x: newX, y: newY, direction: directions.indexOf(dir) };
-                                }
+                        if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !nextCell.walls[(dir.wall + 2) % 4]) {
+                            if (Array.from(visitedCells).find(move => move.x === newX && move.y === newY)) {
+                                continue;
+                            } 
+                            if (newX === cols - 1 && newY === rows - 1) { // goal
+                                possibleMoves.push({ x: newX, y: newY, direction: directions.indexOf(dir) });
+                                break;
+                            } 
+                            const intensity = highlightMap[`${newX},${newY}`] || 0;
+                            if (intensity > maxIntensity) {
+                                maxIntensity = intensity;
+                                possibleMoves = [{ x: newX, y: newY, direction: directions.indexOf(dir) }];
+                            } else if (intensity === maxIntensity) {
+                                possibleMoves.push({ x: newX, y: newY, direction: directions.indexOf(dir) });
                             }
                         }
+                    }
 
-                        if (nextMove) {
-                            if (mouseDirection !== nextMove.direction) {
-                                mouseDirection = nextMove.direction;
-                                draw();
-                            } else {
-                                animateMouseMove(mouseX, mouseY, nextMove.x, nextMove.y, nextMove.direction);
-                                mouseX = nextMove.x;
-                                mouseY = nextMove.y;
-                                visitedCells.add(`${mouseX},${mouseY}`);
-                                moved = true;
-                            }
-                        }
+                    if (possibleMoves.length > 0) {
+                        const nextMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        animateMouseMove(mouseX, mouseY, nextMove.x, nextMove.y, nextMove.direction);
+                        mouseX = nextMove.x;
+                        mouseY = nextMove.y;
+                        mouseDirection = nextMove.direction;
+                        visitedCells.push({x : mouseX, y: mouseY});
+                        moved = true;
+                    }
 
-                        if (mouseX === cheese.x && mouseY === cheese.y) {
-                            cheese = null;
-                            highlightMap = {};
-                        }
-                        if (mouseX === cols - 1 || mouseY === rows - 1 || mouseX === rows - 1 || mouseY === cols - 1 ) {
-                          if (!gameFinished) {
+                    if (cheese && mouseX === cheese.x && mouseY === cheese.y) {
+                        cheese = null;
+                        highlightMap = {};
+                    }
+                    if (mouseX === cols - 1 && mouseY === rows - 1) {
+                        if (!gameFinished) {
                             gameFinished = true;
                             document.getElementById('gameMessage').innerText = 'ゲームクリア！';
-                          }
                         }
-                    } else {
-                        for (let i = 0; i < directions.length; i++) {
-                            const dir = directions[(currentDirection + i) % directions.length];
-                            const newX = mouseX + dir.dx;
-                            const newY = mouseY + dir.dy;
-                            const currentCell = grid[index(mouseX, mouseY)];
-                            const nextCell = grid[index(newX, newY)];
+                    }
 
-                            if (newX >= 0 && newY >= 0 && newX < cols && newY < rows && !currentCell.walls[dir.wall] && !visitedCells.has(`${newX},${newY}`)) {
-                                if (mouseDirection !== (currentDirection + i) % directions.length) {
-                                    mouseDirection = (currentDirection + i) % directions.length;
-                                    draw();
-                                } else {
-                                    animateMouseMove(mouseX, mouseY, newX, newY, (currentDirection + i) % directions.length);
-                                    mouseX = newX;
-                                    mouseY = newY;
-                                    visitedCells.add(`${newX},${newY}`);
-                                    currentDirection = (currentDirection + i) % directions.length;
-                                    moved = true;
-                                }
-                                break;
+                    if (!moved) {
+                        setTimeout(() => {
+                            const nextMove = grid[index(mouseX, mouseY)].checkNeighbors();
+                            if (nextMove) {
+                                mouseX = nextMove.x;
+                                mouseY = nextMove.y;
+                                visitedCells.push({x : mouseX, y: mouseY});
                             }
-                        }
-
-                        if (!moved) {
-                            setTimeout(() => {
-                                const next = grid[index(mouseX, mouseY)].checkNeighbors();
-                                if (next) {
-                                    mouseX = next.x;
-                                    mouseY = next.y;
-                                    visitedCells.add(`${mouseX},${mouseY}`);
-                                }
-                            }, 500);
-                        }
+                        }, 500);
                     }
                 }, 500);
             }
@@ -405,7 +392,23 @@
                 requestAnimationFrame(animate);
             }
 
-            const interval = setInterval(step, 50);
+            function animateTail() {
+                const tailShakeFrequency = 20; // Tail shake frequency in milliseconds
+                const tailShakeAmplitude = Math.PI / 8; // Tail shake amplitude in radians (±25°)
+                const startTime = Date.now();
+
+                function animate() {
+                    const currentTime = Date.now();
+                    const elapsedTime = currentTime - startTime;
+                    tailShakeAngle = tailShakeAmplitude * Math.sin((elapsedTime / tailShakeFrequency) * Math.PI * 2);
+                    //draw();
+                    requestAnimationFrame(animate);
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            animateTail();
         }
 
         canvas.addEventListener('click', (event) => {
@@ -415,7 +418,7 @@
             cheese = { x, y };
             cheeseCount++;
             updateCheeseCountDisplay();
-            visitedCells.clear();
+            visitedCells.length = 0;
             mouseDrawn = false;
             gameFinished = false;
             document.getElementById('gameMessage').innerText = '';
@@ -430,7 +433,7 @@
             cheese = { x, y };
             cheeseCount++;
             updateCheeseCountDisplay();
-            visitedCells.clear();
+            visitedCells.length = 0;
             mouseDrawn = false;
             gameFinished = false;
             document.getElementById('gameMessage').innerText = '';
@@ -446,6 +449,22 @@
             gameFinished = false;
             document.getElementById('gameMessage').innerText = '';
             generateMaze();
+        });
+
+
+        document.getElementById('restartGame').addEventListener('click', () => {
+            clearInterval(mouseInterval);
+            mouseX = 0;
+            mouseY = 0;
+            visitedCells = [{x:0,y:0}];
+            cheese = null;
+            cheeseCount = 0;
+            updateCheeseCountDisplay();
+            mouseDrawn = false;
+            gameFinished = false;
+            document.getElementById('gameMessage').innerText = '';
+            moveMouse();
+            draw();
         });
 
         function animateTail() {
@@ -468,4 +487,3 @@
     </script>
 </body>
 </html>
-```
