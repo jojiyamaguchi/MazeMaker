@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -20,8 +21,9 @@
         <option value="5">レベル 5</option>
     </select>
     <button id="generateMaze">新しい迷路を作る</button>
-    <canvas id="mazeCanvas" width="500" height="500"></canvas>
+    <canvas id="mazeCanvas"></canvas>
     <div id="cheeseCountDisplay">チーズ使用回数: 0</div>
+    <div id="gameMessage"　style="font-size:40pt"></div>
 
     <script>
         const canvas = document.getElementById('mazeCanvas');
@@ -41,16 +43,25 @@
         let cheeseCount = 0;
         let tailShakeAngle = 0;
         let mouseDrawn = false;
+        let gameFinished = false;
 
         function updateCheeseCountDisplay() {
             document.getElementById('cheeseCountDisplay').innerText = `チーズ使用回数: ${cheeseCount}`;
         }
 
+        function setCanvasSize() {
+            const size = Math.min(window.innerWidth, window.innerHeight) * 0.95;
+            canvas.width = size;
+            canvas.height = size;
+        }
+
         function generateMaze() {
+            setCanvasSize();
             const level = parseInt(document.getElementById('level').value);
             cellSize = 100 / level;
-            cols = Math.floor(canvas.width / cellSize);
-            rows = Math.floor(canvas.height / cellSize);
+            cols = Math.ceil(canvas.width / cellSize);
+            rows = cols;
+            //rows = Math.floor(canvas.height / cellSize);
 
             grid = [];
             visitedCells = new Set();
@@ -180,10 +191,13 @@
                 // Draw goal
                 ctx.fillStyle = 'red';
                 ctx.fillRect((cols - 1) * cellSize, (rows - 1) * cellSize, cellSize, cellSize);
+
+                // Draw baby mouse at the goal
+                drawMouse((cols - 1), (rows - 1), 0, 0, true);
             }
 
-            function drawMouse(x, y, direction, tailAngle = 0) {
-                const mouseSize = cellSize * 0.6;
+            function drawMouse(x, y, direction, tailAngle = 0, isBaby = false) {
+                const mouseSize = isBaby ? cellSize / 3 : cellSize * 0.6;
                 const offsetX = (cellSize - mouseSize) / 2;
                 const offsetY = (cellSize - mouseSize) / 2;
 
@@ -316,6 +330,12 @@
                             cheese = null;
                             highlightMap = {};
                         }
+                        if (mouseX === cols - 1 || mouseY === rows - 1 || mouseX === rows - 1 || mouseY === cols - 1 ) {
+                          if (!gameFinished) {
+                            gameFinished = true;
+                            document.getElementById('gameMessage').innerText = 'ゲームクリア！';
+                          }
+                        }
                     } else {
                         for (let i = 0; i < directions.length; i++) {
                             const dir = directions[(currentDirection + i) % directions.length];
@@ -397,6 +417,8 @@
             updateCheeseCountDisplay();
             visitedCells.clear();
             mouseDrawn = false;
+            gameFinished = false;
+            document.getElementById('gameMessage').innerText = '';
             moveMouse();
             draw();
         });
@@ -410,6 +432,8 @@
             updateCheeseCountDisplay();
             visitedCells.clear();
             mouseDrawn = false;
+            gameFinished = false;
+            document.getElementById('gameMessage').innerText = '';
             moveMouse();
             draw();
         });
@@ -419,6 +443,8 @@
             mouseX = 0;
             mouseY = 0;
             mouseDrawn = false;
+            gameFinished = false;
+            document.getElementById('gameMessage').innerText = '';
             generateMaze();
         });
 
@@ -442,3 +468,4 @@
     </script>
 </body>
 </html>
+```
