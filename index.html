@@ -99,10 +99,10 @@
                     drawCheese(cheese.x, cheese.y);
                 }
                 drawStartAndGoal();
-                if (!mouseDrawn) {
-                    drawMouse(mouseX, mouseY, mouseDirection, tailShakeAngle);
-                    mouseDrawn = true;
-                }
+                //if (!mouseDrawn) {
+                //    drawMouse(mouseX, mouseY, mouseDirection, tailShakeAngle);
+                //    mouseDrawn = true;
+                //}
             }
 
             function Cell(x, y) {
@@ -183,11 +183,15 @@
                     stack.push(current);
                     removeWalls(current, next);
                     current = next;
+                    drawMouse(0, 0, 0, 0);
                 } else if (stack.length > 0) {
                     current = stack.pop();
+                    drawMouse(0, 0, 0, 0);
                 } else {
                     clearInterval(interval);
-                    moveMouse();
+                    if (!gameFinished) {
+                      moveMouse();
+                    }
                     return;
                 }
             }
@@ -307,6 +311,9 @@
                     maxIntensity = -1;
                     moved = false;
 
+                    if(gameFinished){
+                        return;
+                    }
                     for (const dir of directions) {
                         const newX = mouseX + dir.dx;
                         const newY = mouseY + dir.dy;
@@ -423,10 +430,9 @@
             cheeseCount++;
             updateCheeseCountDisplay();
             visitedCells.length = 0;
-            mouseDrawn = false;
-            gameFinished = false;
-            document.getElementById('gameMessage').innerText = '';
-            moveMouse();
+            if (!gameFinished) {
+              moveMouse();
+            }
             draw();
         });
 
@@ -438,10 +444,9 @@
             cheeseCount++;
             updateCheeseCountDisplay();
             visitedCells.length = 0;
-            mouseDrawn = false;
-            gameFinished = false;
-            document.getElementById('gameMessage').innerText = '';
-            moveMouse();
+            if (!gameFinished) {
+              moveMouse();
+            }
             draw();
         });
 
