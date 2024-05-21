@@ -51,8 +51,8 @@
 
         function setCanvasSize() {
             let size = Math.min(window.innerWidth, window.innerHeight) * 0.95;
-            if(size > 5) {
-                size = size - size % 5;
+            if(size > 10) {
+                size = size - size % 10;
             }
             canvas.width = size;
             canvas.height = size;
