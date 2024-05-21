@@ -59,7 +59,7 @@
             const interval = setInterval(step, 50); 
             setCanvasSize();
             const level = parseInt(document.getElementById('level').value);
-            cellSize = Math.floor(canvas.width / (level * 10));
+            cellSize = (Math.floor(canvas.width / (level * 10))%10);
             cols = Math.floor(canvas.width / cellSize);
             rows = cols;
 
