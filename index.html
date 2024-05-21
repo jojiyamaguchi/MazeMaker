@@ -51,8 +51,8 @@
 
         function setCanvasSize() {
             let size = Math.min(window.innerWidth, window.innerHeight) * 0.95;
-            if(size > 8) {
-                size = size - size % 8;
+            if(size > 5) {
+                size = size - size % 5;
             }
             canvas.width = size;
             canvas.height = size;
@@ -62,7 +62,7 @@
             const interval = setInterval(step, 50); 
             setCanvasSize();
             const level = parseInt(document.getElementById('level').value);
-            cellSize = Math.floor(canvas.width / (level * 8));
+            cellSize = Math.floor(canvas.width / (level * 5));
 
             cols = Math.floor(canvas.width / cellSize);
             rows = cols;
